@@ -107,6 +107,7 @@ def args_parser():
     
     parser.add_argument('--turn', type=int, default=0)
     parser.add_argument('--noise', type=float, default=0.001)
+    parser.add_argument('--tau', type=float, default=0.8)
     parser.add_argument('--all_clients', action='store_true',
                         help='aggregation over all clients') 
 

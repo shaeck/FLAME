@@ -4,6 +4,7 @@ import torch
 import copy
 import time
 import hdbscan
+from torchmetrics.functional import pairwise_cosine_similarity
 
 def cos(a, b):
     # res = np.sum(a*b.T)/((np.sqrt(np.sum(a * a.T)) + 1e-9) * (np.sqrt(np.sum(b * b.T))) + 1e-
@@ -24,7 +25,6 @@ def fltrust(params, central_param, global_parameters, args):
     sum_parameters = None
     for local_parameters in params:
         local_parameters_v = parameters_dict_to_vector_flt(local_parameters)
-        # 计算cos相似度得分和向量长度裁剪值
         client_cos = cos(central_param_v, local_parameters_v)
         client_cos = max(client_cos.item(), 0)
         client_clipped_value = central_norm/torch.norm(local_parameters_v)
@@ -33,7 +33,6 @@ def fltrust(params, central_param, global_parameters, args):
         if sum_parameters is None:
             sum_parameters = {}
             for key, var in local_parameters.items():
-                # 乘得分 再乘裁剪值
                 sum_parameters[key] = client_cos * \
                     client_clipped_value * var.clone()
         else:
@@ -44,7 +43,6 @@ def fltrust(params, central_param, global_parameters, args):
         print(score_list)
         return global_parameters
     for var in global_parameters:
-        # 除以所以客户端的信任得分总和
         temp = (sum_parameters[var] / FLTrustTotalScore)
         if global_parameters[var].type() != temp.type():
             temp = temp.type(global_parameters[var].type())
@@ -63,7 +61,7 @@ def parameters_dict_to_vector_flt(net_dict) -> torch.Tensor:
         if key.split('.')[-1] == 'num_batches_tracked':
             continue
         vec.append(param.view(-1))
-    return torch.cat(vec)
+    return torch.cat(vec).unsqueeze(0)
 
 def parameters_dict_to_vector_flt_cpu(net_dict) -> torch.Tensor:
     vec = []
@@ -287,10 +285,12 @@ def compute_robustLR(params, args):
 def flame(local_model, update_params, global_model, args):
     cos = torch.nn.CosineSimilarity(dim=0, eps=1e-6).cuda()
     cos_list=[]
+    
     local_model_vector = []
     for param in local_model:
-        # local_model_vector.append(parameters_dict_to_vector_flt_cpu(param))
+        #local_model_vector.append(parameters_dict_to_vector_flt_cpu(param))
         local_model_vector.append(parameters_dict_to_vector_flt(param))
+    '''
     for i in range(len(local_model_vector)):
         cos_i = []
         for j in range(len(local_model_vector)):
@@ -298,11 +298,17 @@ def flame(local_model, update_params, global_model, args):
             # cos_i.append(round(cos_ij.item(),4))
             cos_i.append(cos_ij.item())
         cos_list.append(cos_i)
+    '''
+    
+    local_model_vector = torch.cat(local_model_vector, dim=0)
+    #print(local_model_vector.shape)
+    cos_list = pairwise_cosine_similarity(local_model_vector, zero_diagonal=False)
     num_clients = max(int(args.frac * args.num_users), 1)
     num_malicious_clients = int(args.malicious * num_clients)
     num_benign_clients = num_clients - num_malicious_clients
     clusterer = hdbscan.HDBSCAN(min_cluster_size=num_clients//2 + 1,min_samples=1,allow_single_cluster=True).fit(cos_list)
-    print(clusterer.labels_)
+    print('Cluster Labels', clusterer.labels_)
+    print('Cluster Max', clusterer.labels_.max())
     benign_client = []
     norm_list = np.array([])
 
@@ -322,7 +328,7 @@ def flame(local_model, update_params, global_model, args):
                 benign_client.append(i)
                 # norm_list = np.append(norm_list,torch.norm(update_params_vector[i],p=2))  # consider BN
                 norm_list = np.append(norm_list,torch.norm(parameters_dict_to_vector(update_params[i]),p=2).item())  # no consider BN
-    print(benign_client)
+    print('Benign Clients', benign_client)
    
     for i in range(len(benign_client)):
         if benign_client[i] < num_malicious_clients:
