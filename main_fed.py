@@ -6,9 +6,9 @@ from random import random
 from models.test import test_img
 from models.Fed import FedAvg
 from models.Nets import ResNet18, vgg19_bn, vgg19, get_model
+from models.Client import SwarmClient
+from models.Reputation import Reputation
 
-from models.MaliciousUpdate import LocalMaliciousUpdate
-from models.Update import LocalUpdate
 from utils.info import print_exp_details, write_info_to_accfile, get_base_info
 from utils.options import args_parser
 from utils.sampling import mnist_iid, mnist_noniid, cifar_iid, cifar_noniid
@@ -26,43 +26,29 @@ import math
 matplotlib.use('Agg')
 
 
-def write_file(filename, accu_list, back_list, args, analyse = False):
+def write_file(filename, accu_list, args, analyse = False):
     write_info_to_accfile(filename, args)
     f = open(filename, "a")
     f.write("main_task_accuracy=")
     f.write(str(accu_list))
     f.write('\n')
     f.write("backdoor_accuracy=")
-    f.write(str(back_list))
-    if args.defence == "krum":
-        krum_file = filename+"_krum_dis"
-        torch.save(args.krum_distance,krum_file)
     if analyse == True:
         need_length = len(accu_list)//10
         acc = accu_list[-need_length:]
-        back = back_list[-need_length:]
         best_acc = round(max(acc),2)
-        average_back=round(np.mean(back),2)
-        best_back=round(max(back),2)
-        f.write('\n')
-        f.write('BBSR:')
-        f.write(str(best_back))
-        f.write('\n')
-        f.write('ABSR:')
-        f.write(str(average_back))
         f.write('\n')
         f.write('max acc:')
         f.write(str(best_acc))
         f.write('\n')
         f.close()
-        return best_acc, average_back, best_back
+        return best_acc
     f.close()
 
 
 def central_dataset_iid(dataset, dataset_size):
     all_idxs = [i for i in range(len(dataset))]
-    central_dataset = set(np.random.choice(
-        all_idxs, dataset_size, replace=False))
+    central_dataset = set(np.random.choice(all_idxs, dataset_size, replace=False))
     return central_dataset
 
 def test_mkdir(path):
@@ -139,10 +125,6 @@ if __name__ == '__main__':
     net_best = None
     best_loss = None
     
-    if math.isclose(args.malicious, 0):
-        backdoor_begin_acc = 100
-    else:
-        backdoor_begin_acc = args.attack_begin  # overtake backdoor_begin_acc then attack
     central_dataset = central_dataset_iid(dataset_test, args.server_dataset)
     base_info = get_base_info(args)
     filename = './'+args.save+'/accuracy_file_{}.txt'.format(base_info)
@@ -154,18 +136,16 @@ if __name__ == '__main__':
 
         
     val_acc_list, net_list = [0], []
-    backdoor_acculist = [0]
 
-    args.attack_layers=[]
-    
-    if args.attack == "dba":
-        args.dba_sign=0
-    if args.defence == "krum":
-        args.krum_distance=[]
+    clients = list()
+    last_aggregator = 0
+    metrics = dict()
         
     if args.all_clients:
         print("Aggregation over all clients")
-        w_locals = [w_glob for i in range(args.num_users)]
+        w_locals = [w_glob for _ in range(args.num_users)]
+        clients = [SwarmClient(args, dataset_train, i) for i in range(args.num_users)]
+        reputation = Reputation(clients)
     for iter in range(args.epochs):
         loss_locals = []
         if not args.all_clients:
@@ -173,89 +153,51 @@ if __name__ == '__main__':
             w_updates = []
         m = max(int(args.frac * args.num_users), 1)
         idxs_users = np.random.choice(range(args.num_users), m, replace=False)
-        attack_number = int(args.malicious * m)
-        
+
         for num_turn, idx in enumerate(idxs_users):
-            if attack_number > 0:
-                attack = True
-            else:
-                attack = False
-            if attack == True:
-                idx = random.randint(0, int(args.num_users * args.malicious))
-                if args.attack == "dba":
-                    num_dba_attacker = int(args.num_users * args.malicious)
-                    dba_group = num_dba_attacker/4
-                    idx = args.dba_sign % (4*dba_group)
-                    args.dba_sign+=1
-                local = LocalMaliciousUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx], order=idx)
-                if args.attack == "layerattack_ER_his" or args.attack == "LFA" or args.attack == "LPA":
-                    w, loss, args.attack_layers = local.train(
-                        net=copy.deepcopy(net_glob).to(args.device), test_img = test_img)
-                else:
-                    w, loss = local.train(
-                        net=copy.deepcopy(net_glob).to(args.device), test_img = test_img)
-                print("client", idx, "--attack--")
-                attack_number -= 1
-            else:
-                local = LocalUpdate(
-                    args=args, dataset=dataset_train, idxs=dict_users[idx])
-                w, loss = local.train(
-                    net=copy.deepcopy(net_glob).to(args.device))
-            w_updates.append(get_update(w, w_glob))
+            w, loss = clients[num_turn].update(net_glob, dict_users[idx])
+            # w_updates.append(get_update(w, w_glob))
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
             else:
                 w_locals.append(copy.deepcopy(w))
             loss_locals.append(copy.deepcopy(loss))
-
-        if args.defence == 'avg':  # no defence
-            w_glob = FedAvg(w_locals)
-        elif args.defence == 'krum':  # single krum
-            selected_client = multi_krum(w_updates, 1, args)
-            # print(args.krum_distance)
-            w_glob = w_locals[selected_client[0]]
-            # w_glob = FedAvg([w_locals[i] for i in selected_clinet])
-        elif args.defence == 'RLR':
-            w_glob = RLR(copy.deepcopy(net_glob), w_updates, args)
-        elif args.defence == 'fltrust':
-            local = LocalUpdate(
-                args=args, dataset=dataset_test, idxs=central_dataset)
-            fltrust_norm, loss = local.train(
-                net=copy.deepcopy(net_glob).to(args.device))
-            fltrust_norm = get_update(fltrust_norm, w_glob)
-            w_glob = fltrust(w_updates, fltrust_norm, w_glob, args)
-        elif args.defence == 'flame':
-            w_glob = flame(w_locals,w_updates,w_glob, args)
-        else:
-            print("Wrong Defense Method")
-            os._exit(0)
+        
+        #choose client to aggregate here
+        #reputation model aggregation
+        metrics["quality"] = 1
+        metrics["time"] = 1
+        metrics["success_fail"] = 1
+        new_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
+        w_glob = clients[new_aggregator].aggregate(w_locals)
+        last_aggregator = new_aggregator
+        
+        #random aggregation
+        # client_id = np.random.randint(0, (len(clients)-1))
+        # w_glob = clients[client_id].aggregate(w_locals)
         
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)
 
-        # print loss
+        # show loss
         loss_avg = sum(loss_locals) / len(loss_locals)
         print('Round {:3d}, Average loss {:.3f}'.format(iter, loss_avg))
         loss_train.append(loss_avg)
 
         if iter % 1 == 0:
-            acc_test, _, back_acc = test_img(
-                net_glob, dataset_test, args, test_backdoor=True)
+            acc_test, _ = test_img(net_glob, dataset_test, args)
             print("Main accuracy: {:.2f}".format(acc_test))
-            print("Backdoor accuracy: {:.2f}".format(back_acc))
             val_acc_list.append(acc_test.item())
 
-            backdoor_acculist.append(back_acc)
-            write_file(filename, val_acc_list, backdoor_acculist, args)
+            write_file(filename, val_acc_list, args)
     
-    best_acc, absr, bbsr = write_file(filename, val_acc_list, backdoor_acculist, args, True)
+    best_acc = write_file(filename, val_acc_list, args, True)
     
     # plot loss curve
     plt.figure()
     plt.xlabel('communication')
     plt.ylabel('accu_rate')
     plt.plot(val_acc_list, label = 'main task(acc:'+str(best_acc)+'%)')
-    plt.plot(backdoor_acculist, label = 'backdoor task(BBSR:'+str(bbsr)+'%, ABSR:'+str(absr)+'%)')
     plt.legend()
     title = base_info
     # plt.title(title, y=-0.3)

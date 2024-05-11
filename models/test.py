@@ -19,8 +19,6 @@ def test_img(net_g, datatest, args, test_backdoor=False):
     correct = 0
     data_loader = DataLoader(datatest, batch_size=args.bs)
     l = len(data_loader)
-    back_correct = 0
-    back_num = 0
     for idx, (data, target) in enumerate(data_loader):
         if args.gpu != -1:
             data, target = data.to(args.device), target.to(args.device)
@@ -30,28 +28,11 @@ def test_img(net_g, datatest, args, test_backdoor=False):
         # get the index of the max log-probability
         y_pred = log_probs.data.max(1, keepdim=True)[1]
         correct += y_pred.eq(target.data.view_as(y_pred)).long().cpu().sum()
-        if test_backdoor:
-            del_arr = []
-            for k, image in enumerate(data):
-                if test_or_not(args, target[k]):  # one2one need test
-                    # data[k][:, 0:5, 0:5] = torch.max(data[k])
-                    data[k] = add_trigger(args,data[k])
-                    save_img(data[k])
-                    target[k] = args.attack_label
-                    back_num += 1
-                else:
-                    target[k] = -1
-            log_probs = net_g(data)
-            y_pred = log_probs.data.max(1, keepdim=True)[1]
-            back_correct += y_pred.eq(target.data.view_as(y_pred)).long().cpu().sum()
     test_loss /= len(data_loader.dataset)
     accuracy = 100.00 * correct / len(data_loader.dataset)
     if args.verbose:
         print('\nTest set: Average loss: {:.4f} \nAccuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, correct, len(data_loader.dataset), accuracy))
-    if test_backdoor:
-        back_accu = 100.00 * float(back_correct) / back_num
-        return accuracy, test_loss, back_accu
     return accuracy, test_loss
 
 def test_or_not(args, label):
