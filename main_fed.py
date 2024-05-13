@@ -163,18 +163,24 @@ if __name__ == '__main__':
                 w_locals.append(copy.deepcopy(w))
             loss_locals.append(copy.deepcopy(loss))
         
+        w_glob = 0
+
         #choose client to aggregate here
-        #reputation model aggregation
-        metrics["quality"] = 1
-        metrics["time"] = 1
-        metrics["success_fail"] = 1
-        new_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
-        w_glob = clients[new_aggregator].aggregate(w_locals)
-        last_aggregator = new_aggregator
-        
-        #random aggregation
-        # client_id = np.random.randint(0, (len(clients)-1))
-        # w_glob = clients[client_id].aggregate(w_locals)
+        if args.swarm:
+            #reputation model aggregation
+            # metrics["quality"] = 1
+            # metrics["time"] = 1
+            # metrics["success_fail"] = 1
+            # new_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
+            # w_glob = clients[new_aggregator].aggregate(w_locals)
+            # last_aggregator = new_aggregator
+            
+            #random aggregation
+            client_id = np.random.randint(0, (len(clients)-1))
+            w_glob = clients[client_id].aggregate(w_locals)
+        if args.federated:
+            #federated learning
+            w_glob = FedAvg(w_locals)
         
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)

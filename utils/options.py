@@ -13,7 +13,7 @@ def args_parser():
     parser.add_argument('--init', type=str, default='None',
                         help="location of init model")
     # federated arguments
-    parser.add_argument('--epochs', type=int, default=500,
+    parser.add_argument('--epochs', type=int, default=300,
                         help="rounds of training")
     parser.add_argument('--num_users', type=int,
                         default=100, help="number of users: K")
@@ -110,6 +110,10 @@ def args_parser():
     parser.add_argument('--tau', type=float, default=0.8)
     parser.add_argument('--all_clients', action='store_true',
                         help='aggregation over all clients') 
+    parser.add_argument('--federated', action='store_true',
+                        help='federated learning') 
+    parser.add_argument('--swarm', action='store_true',
+                        help='swarm learning') 
 
 
     args = parser.parse_args()

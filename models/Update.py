@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # Python version: 3.6
 
-from tkinter.messagebox import NO
+# from tkinter.messagebox import NO
 import torch
 from torch import nn, autograd
 from torch.utils.data import DataLoader, Dataset
