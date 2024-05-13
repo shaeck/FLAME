@@ -80,6 +80,10 @@ def get_base_info(args):
     else:
         base_info = '{}_{}_{}_{}'.format(args.dataset,
                     args.model, args.defence, int(time.time()))
+    if args.swarm:
+         base_info = base_info + '_swarm'
+         if args.smart:
+             base_info = base_info + '_smart'
     if math.isclose(args.malicious, 0) == False:
         base_info = base_info + '_{}_{}malicious_{}poisondata'.format(args.attack, args.malicious, args.poison_frac)
     else:

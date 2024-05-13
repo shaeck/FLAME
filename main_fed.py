@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Python version: 3.6
-
+import time
 from random import random
 from models.test import test_img
 from models.Fed import FedAvg
-from models.Nets import ResNet18, vgg19_bn, vgg19, get_model
+from models.Nets import ResNet18, vgg19_bn, vgg11_bn, get_model
 from models.Client import SwarmClient
+from models.BadClient import BadClient
 from models.Reputation import Reputation
 
 from utils.info import print_exp_details, write_info_to_accfile, get_base_info
 from utils.options import args_parser
 from utils.sampling import mnist_iid, mnist_noniid, cifar_iid, cifar_noniid
-from utils.defense import fltrust, multi_krum, get_update, RLR, flame
 import torch
 from torchvision import datasets, transforms
 import numpy as np
@@ -26,13 +26,18 @@ import math
 matplotlib.use('Agg')
 
 
-def write_file(filename, accu_list, args, analyse = False):
+def write_file(filename, accu_list, time_total, time_aggr, args, analyse = False):
     write_info_to_accfile(filename, args)
     f = open(filename, "a")
     f.write("main_task_accuracy=")
     f.write(str(accu_list))
     f.write('\n')
-    f.write("backdoor_accuracy=")
+    f.write("time total per epoch=")
+    f.write(str(time_total))
+    f.write('\n')
+    f.write("time over aggregation per round=")
+    f.write(str(time_aggr))
+    f.write('\n')
     if analyse == True:
         need_length = len(accu_list)//10
         acc = accu_list[-need_length:]
@@ -105,11 +110,19 @@ if __name__ == '__main__':
 
     # build model
     if args.model == 'VGG' and args.dataset == 'cifar':
-        net_glob = vgg19_bn().to(args.device)
+        net_glob = vgg19_bn(args.dataset).to(args.device)
     elif args.model == "resnet" and args.dataset == 'cifar':
-        net_glob = ResNet18().to(args.device)
+        net_glob = ResNet18(args.dataset).to(args.device)
+    elif args.model == "resnet" and args.dataset == 'mnist':
+        net_glob = ResNet18(args.dataset).to(args.device)
+    elif args.model == "resnet" and args.dataset == 'fashion_mnist':
+        net_glob = ResNet18(args.dataset).to(args.device)
+    elif args.dataset == 'cifar':
+        net_glob = get_model('cifar10').to(args.device)
     elif args.model == "rlr_mnist" or args.model == "cnn":
         net_glob = get_model('fmnist').to(args.device)
+    elif args.model == "fcn":
+        net_glob = get_model('fcn').to(args.device)
     else:
         exit('Error: unrecognized model')
     
@@ -135,63 +148,88 @@ if __name__ == '__main__':
         print("load init model")
 
         
-    val_acc_list, net_list = [0], []
+    val_acc_list, net_list, time_total_list, time_aggregation_list = [0], [], [], []
 
     clients = list()
+    clients = [SwarmClient(args, dataset_train, i) for i in range(args.num_users)]
+    badclients_percentage = int((args.num_users / 100) * 60)
+    for i in range(badclients_percentage):
+        clients[i] =  BadClient(args, dataset_train, i)
     last_aggregator = 0
     metrics = dict()
+    data_length_div = len(dict_users)
         
     if args.all_clients:
         print("Aggregation over all clients")
         w_locals = [w_glob for _ in range(args.num_users)]
-        clients = [SwarmClient(args, dataset_train, i) for i in range(args.num_users)]
         reputation = Reputation(clients)
     for iter in range(args.epochs):
+        start = time.time()
         loss_locals = []
         if not args.all_clients:
             w_locals = []
             w_updates = []
         m = max(int(args.frac * args.num_users), 1)
+        # m = max(int(args.num_users), 1)
         idxs_users = np.random.choice(range(args.num_users), m, replace=False)
 
         for num_turn, idx in enumerate(idxs_users):
-            w, loss = clients[num_turn].update(net_glob, dict_users[idx])
-            # w_updates.append(get_update(w, w_glob))
+            data_seg_id = idx % data_length_div
+            w, loss = clients[num_turn].update(net_glob, dict_users[data_seg_id])
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
             else:
                 w_locals.append(copy.deepcopy(w))
             loss_locals.append(copy.deepcopy(loss))
         
+        w_glob = 0
+
+        time_aggregation_start = time.time()
+
         #choose client to aggregate here
-        #reputation model aggregation
-        metrics["quality"] = 1
-        metrics["time"] = 1
-        metrics["success_fail"] = 1
-        new_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
-        w_glob = clients[new_aggregator].aggregate(w_locals)
-        last_aggregator = new_aggregator
-        
-        #random aggregation
-        # client_id = np.random.randint(0, (len(clients)-1))
-        # w_glob = clients[client_id].aggregate(w_locals)
+        if args.swarm:
+            #reputation model aggregation
+            if args.smart:
+                w_glob = clients[last_aggregator].aggregate(w_locals)
+            
+            #random aggregation
+            if args.random:
+                client_id = np.random.randint(0, (len(clients)-1))
+                w_glob = clients[client_id].aggregate(w_locals)
+        if args.federated:
+            #federated learning
+            w_glob = clients[0].aggregate(w_locals)
         
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)
 
+        
+        end = time.time()
         # show loss
         loss_avg = sum(loss_locals) / len(loss_locals)
         print('Round {:3d}, Average loss {:.3f}'.format(iter, loss_avg))
         loss_train.append(loss_avg)
 
         if iter % 1 == 0:
-            acc_test, _ = test_img(net_glob, dataset_test, args)
+            acc_test, loss_test = test_img(net_glob, dataset_test, args)
             print("Main accuracy: {:.2f}".format(acc_test))
             val_acc_list.append(acc_test.item())
+            aggregation_time = end-time_aggregation_start
+            time_aggregation_list.append(aggregation_time)
+            time_total_list.append(end-start)
 
-            write_file(filename, val_acc_list, args)
+            if iter % 20 == 0:
+                write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args)
+
+            #choose new aggregator here
+            if args.smart:
+                # metrics["quality"] = 100*(val_loss_pre - loss_test)
+                metrics["quality"] = 100*(val_acc_list[-1] - val_acc_list[-2])
+                last_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
+                val_loss_pre = loss_test
     
-    best_acc = write_file(filename, val_acc_list, args, True)
+    best_acc = write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args, True)
+    reputation.print_reputation()
     
     # plot loss curve
     plt.figure()

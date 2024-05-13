@@ -10,9 +10,7 @@ from skimage import io
 import cv2
 from skimage import img_as_ubyte
 import numpy as np
-def test_img(net_g, datatest, args, test_backdoor=False):
-    args.watermark = None
-    args.apple = None
+def test_img(net_g, datatest, args):
     net_g.eval()
     # testing
     test_loss = 0
@@ -22,6 +20,7 @@ def test_img(net_g, datatest, args, test_backdoor=False):
     for idx, (data, target) in enumerate(data_loader):
         if args.gpu != -1:
             data, target = data.to(args.device), target.to(args.device)
+        # log_probs = net_g(data)
         log_probs = net_g(data)
         # sum up batch loss
         test_loss += F.cross_entropy(log_probs, target, reduction='sum').item()
@@ -47,44 +46,6 @@ def test_or_not(args, label):
         else:
             return False
         
-def add_trigger(args, image):
-        if args.trigger == 'square':
-            pixel_max = torch.max(image) if torch.max(image)>1 else 1
-            
-            image[:,args.triggerY:args.triggerY+5,args.triggerX:args.triggerX+5] = pixel_max
-        elif args.trigger == 'pattern':
-            pixel_max = torch.max(image) if torch.max(image)>1 else 1
-            image[:,args.triggerY+0,args.triggerX+0] = pixel_max
-            image[:,args.triggerY+1,args.triggerX+1] = pixel_max
-            image[:,args.triggerY-1,args.triggerX+1] = pixel_max
-            image[:,args.triggerY+1,args.triggerX-1] = pixel_max
-        elif args.trigger == 'watermark':
-            if args.watermark is None:
-                args.watermark = cv2.imread('./utils/watermark.png', cv2.IMREAD_GRAYSCALE)
-                args.watermark = cv2.bitwise_not(args.watermark)
-                args.watermark = cv2.resize(args.watermark, dsize=image[0].shape, interpolation=cv2.INTER_CUBIC)
-                pixel_max = np.max(args.watermark)
-                args.watermark = args.watermark.astype(np.float64) / pixel_max
-                # cifar [0,1] else max>1
-                pixel_max_dataset = torch.max(image).item() if torch.max(image).item() > 1 else 1
-                args.watermark *= pixel_max_dataset
-            max_pixel = max(np.max(args.watermark),torch.max(image))
-            image = (image.cpu() + args.watermark).to(args.gpu)
-            image[image>max_pixel]=max_pixel
-        elif args.trigger == 'apple':
-            if args.apple is None:
-                args.apple = cv2.imread('./utils/apple.png', cv2.IMREAD_GRAYSCALE)
-                args.apple = cv2.bitwise_not(args.apple)
-                args.apple = cv2.resize(args.apple, dsize=image[0].shape, interpolation=cv2.INTER_CUBIC)
-                pixel_max = np.max(args.apple)
-                args.apple = args.apple.astype(np.float64) / pixel_max
-                # cifar [0,1] else max>1
-                pixel_max_dataset = torch.max(image).item() if torch.max(image).item() > 1 else 1
-                args.apple *= pixel_max_dataset
-            max_pixel = max(np.max(args.apple),torch.max(image))
-            image += (image.cpu() + args.apple).to(args.gpu)
-            image[image>max_pixel]=max_pixel
-        return image
 def save_img(image):
         img = image
         if image.shape[0] == 1:

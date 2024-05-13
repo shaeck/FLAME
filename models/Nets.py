@@ -8,6 +8,11 @@ import torch.nn.functional as F
 import torch.nn.init as init
 import math
 
+def get_num_channels(data):
+    if "mnist" in data:
+        return 1
+    return 3
+
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -68,11 +73,11 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
+    def __init__(self, block, num_blocks, num_classes=10, num_channels=3):
         super(ResNet, self).__init__()
         self.in_planes = 64
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3,
+        self.conv1 = nn.Conv2d(num_channels, 64, kernel_size=3,
                                stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
@@ -101,24 +106,29 @@ class ResNet(nn.Module):
         return out
 
 
-def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+def ResNet18(data):
+    num_channels = get_num_channels(data)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_channels=num_channels)
 
 
-def ResNet34():
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+def ResNet34(data):
+    num_channels = get_num_channels(data)
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_channels=num_channels)
 
 
-def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+def ResNet50(data):
+    num_channels = get_num_channels(data)
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_channels=num_channels)
 
 
-def ResNet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
+def ResNet101(data):
+    num_channels = get_num_channels(data)
+    return ResNet(Bottleneck, [3, 4, 23, 3], num_channels=num_channels)
 
 
-def ResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
+def ResNet152(data):
+    num_channels = get_num_channels(data)
+    return ResNet(Bottleneck, [3, 8, 36, 3], num_channels=num_channels)
 
 
 
@@ -159,9 +169,9 @@ class VGG(nn.Module):
         return x
 
 
-def make_layers(cfg, batch_norm=False):
+def make_layers(cfg, batch_norm=False, num_channels=3):
     layers = []
-    in_channels = 3
+    in_channels = num_channels
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -184,50 +194,60 @@ cfg = {
 }
 
 
-def vgg11():
+def vgg11(data):
     """VGG 11-layer model (configuration "A")"""
-    return VGG(make_layers(cfg['A']))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['A'], num_channels=num_channels))
 
 
-def vgg11_bn():
+def vgg11_bn(data):
     """VGG 11-layer model (configuration "A") with batch normalization"""
-    return VGG(make_layers(cfg['A'], batch_norm=True))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['A'], batch_norm=True, num_channels=num_channels))
 
 
-def vgg13():
+def vgg13(data):
     """VGG 13-layer model (configuration "B")"""
-    return VGG(make_layers(cfg['B']))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['B'], num_channels=num_channels))
 
 
-def vgg13_bn():
+def vgg13_bn(data):
     """VGG 13-layer model (configuration "B") with batch normalization"""
-    return VGG(make_layers(cfg['B'], batch_norm=True))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['B'], batch_norm=True, num_channels=num_channels))
 
 
-def vgg16():
+def vgg16(data):
     """VGG 16-layer model (configuration "D")"""
-    return VGG(make_layers(cfg['D']))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['D'], num_channels=num_channels))
 
 
-def vgg16_bn():
+def vgg16_bn(data):
     """VGG 16-layer model (configuration "D") with batch normalization"""
-    return VGG(make_layers(cfg['D'], batch_norm=True))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['D'], batch_norm=True, num_channels=num_channels))
 
 
-def vgg19():
+def vgg19(data):
     """VGG 19-layer model (configuration "E")"""
-    return VGG(make_layers(cfg['E']))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['E'], num_channels=num_channels))
 
 
-def vgg19_bn():
+def vgg19_bn(data):
     """VGG 19-layer model (configuration 'E') with batch normalization"""
-    return VGG(make_layers(cfg['E'], batch_norm=True))
+    num_channels = get_num_channels(data)
+    return VGG(make_layers(cfg['E'], batch_norm=True, num_channels=num_channels))
 
 def get_model(data):
     if data == 'fmnist' or data == 'fedemnist':
         return CNN_MNIST()
     elif data == 'cifar10':
         return CNN_CIFAR()
+    elif data == 'fcn':
+        return FCN()
                
 
 class CNN_MNIST(nn.Module):
@@ -250,4 +270,68 @@ class CNN_MNIST(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.drop2(x)
         x = self.fc2(x)
-        return x        
+        return x      
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=(3,3))
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=(3,3))
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=(3,3))
+        self.max_pool = nn.MaxPool2d(kernel_size=(2, 2))
+        self.drop1 = nn.Dropout2d(p=0.5)
+        self.fc1 = nn.Linear(12544, 256)  # assuming input size is 224x224
+        self.drop2 = nn.Dropout2d(p=0.5)
+        self.fc2 = nn.Linear(256, 10)
+        
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = self.max_pool(x)
+        x = x.view(-1, 12544)  # assuming input size is 224x224
+        x = self.drop1(x)
+        x = F.relu(self.fc1(x))
+        x = self.drop2(x)
+        x = self.fc2(x)
+        return x
+    
+class CNN_CIFAR(nn.Module):
+    def __init__(self):
+        super(CNN_CIFAR, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=(3,3))
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=(3,3))
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=(3,3))
+        self.max_pool = nn.MaxPool2d(kernel_size=(2, 2))
+        self.drop1 = nn.Dropout2d(p=0.5)
+        self.fc1 = nn.Linear(25600, 128)
+        self.drop2 = nn.Dropout2d(p=0.5)
+        self.fc2 = nn.Linear(128, 10)
+        
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.max_pool(x)
+        x = F.relu(self.conv2(x))
+        x = self.max_pool(x)
+        x = F.relu(self.conv3(x))
+        x = self.max_pool(x)
+        x = x.view(-1, 25600)
+        x = self.drop1(x)
+        x = F.relu(self.fc1(x))
+        x = self.drop2(x)
+        x = self.fc2(x)
+        return x
+    
+
+class FCN(nn.Module):
+    def __init__(self):
+        super(FCN, self).__init__()
+        self.fc1 = nn.Linear(784, 256)  
+        self.fc2 = nn.Linear(256, 128)  
+        self.fc3 = nn.Linear(128, 10)   
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))  
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x

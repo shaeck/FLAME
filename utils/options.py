@@ -13,7 +13,7 @@ def args_parser():
     parser.add_argument('--init', type=str, default='None',
                         help="location of init model")
     # federated arguments
-    parser.add_argument('--epochs', type=int, default=500,
+    parser.add_argument('--epochs', type=int, default=100,
                         help="rounds of training")
     parser.add_argument('--num_users', type=int,
                         default=100, help="number of users: K")
@@ -25,7 +25,7 @@ def args_parser():
     parser.add_argument('--attack', type=str,
                         default='badnet', help='attack method')
     
-    parser.add_argument('--poison_frac', type=float, default=0.2, 
+    parser.add_argument('--poison_frac', type=float, default=0.1, 
                         help="fraction of dataset to corrupt for backdoor attack, 1.0 for layer attack")
 
     # *****local_ep = 3, local_bs=50, lr=0.1*******
@@ -110,6 +110,14 @@ def args_parser():
     parser.add_argument('--tau', type=float, default=0.8)
     parser.add_argument('--all_clients', action='store_true',
                         help='aggregation over all clients') 
+    parser.add_argument('--federated', action='store_true',
+                        help='federated learning') 
+    parser.add_argument('--swarm', action='store_true',
+                        help='swarm learning') 
+    parser.add_argument('--smart', action='store_true',
+                        help='smart implementation of swarm learning') 
+    parser.add_argument('--random', action='store_true',
+                        help='random client selection swarm learning') 
 
 
     args = parser.parse_args()
