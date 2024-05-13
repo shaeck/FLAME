@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Python version: 3.6
-
+import time
 from random import random
 from models.test import test_img
 from models.Fed import FedAvg
@@ -26,13 +26,18 @@ import math
 matplotlib.use('Agg')
 
 
-def write_file(filename, accu_list, args, analyse = False):
+def write_file(filename, accu_list, time_total, time_aggr, args, analyse = False):
     write_info_to_accfile(filename, args)
     f = open(filename, "a")
     f.write("main_task_accuracy=")
     f.write(str(accu_list))
     f.write('\n')
-    f.write("backdoor_accuracy=")
+    f.write("time total per epoch=")
+    f.write(str(time_total))
+    f.write('\n')
+    f.write("time over aggregation per round=")
+    f.write(str(time_aggr))
+    f.write('\n')
     if analyse == True:
         need_length = len(accu_list)//10
         acc = accu_list[-need_length:]
@@ -135,7 +140,7 @@ if __name__ == '__main__':
         print("load init model")
 
         
-    val_acc_list, net_list = [0], []
+    val_acc_list, net_list, time_total_list, time_aggregation_list = [0], [], [], []
 
     clients = list()
     last_aggregator = 0
@@ -147,6 +152,7 @@ if __name__ == '__main__':
         clients = [SwarmClient(args, dataset_train, i) for i in range(args.num_users)]
         reputation = Reputation(clients)
     for iter in range(args.epochs):
+        start = time.time()
         loss_locals = []
         if not args.all_clients:
             w_locals = []
@@ -164,6 +170,8 @@ if __name__ == '__main__':
             loss_locals.append(copy.deepcopy(loss))
         
         w_glob = 0
+
+        time_aggregation_start = time.time()
 
         #choose client to aggregate here
         if args.swarm:
@@ -185,6 +193,8 @@ if __name__ == '__main__':
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)
 
+        
+        end = time.time()
         # show loss
         loss_avg = sum(loss_locals) / len(loss_locals)
         print('Round {:3d}, Average loss {:.3f}'.format(iter, loss_avg))
@@ -194,10 +204,12 @@ if __name__ == '__main__':
             acc_test, _ = test_img(net_glob, dataset_test, args)
             print("Main accuracy: {:.2f}".format(acc_test))
             val_acc_list.append(acc_test.item())
+            time_aggregation_list.append(end-time_aggregation_start)
+            time_total_list.append(end-start)
 
-            write_file(filename, val_acc_list, args)
+            write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args)
     
-    best_acc = write_file(filename, val_acc_list, args, True)
+    best_acc = write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args, True)
     
     # plot loss curve
     plt.figure()

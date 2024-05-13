@@ -57,7 +57,6 @@ python main_fed.py      --dataset cifar,fashion_mnist \
                         --epochs 200 \
                         --attack_label 5 \
                         --attack_goal -1 \
-                        --trigger 'square','pattern','watermark','apple' \
                         --triggerX 27 \
                         --triggerY 27 \
                         --gpu 0 \
