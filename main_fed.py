@@ -176,16 +176,11 @@ if __name__ == '__main__':
         #choose client to aggregate here
         if args.swarm:
             #reputation model aggregation
-            # metrics["quality"] = 1
-            # metrics["time"] = 1
-            # metrics["success_fail"] = 1
-            # new_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
-            # w_glob = clients[new_aggregator].aggregate(w_locals)
-            # last_aggregator = new_aggregator
+            w_glob = clients[last_aggregator].aggregate(w_locals)
             
             #random aggregation
-            client_id = np.random.randint(0, (len(clients)-1))
-            w_glob = clients[client_id].aggregate(w_locals)
+            # client_id = np.random.randint(0, (len(clients)-1))
+            # w_glob = clients[client_id].aggregate(w_locals)
         if args.federated:
             #federated learning
             w_glob = FedAvg(w_locals)
@@ -204,12 +199,21 @@ if __name__ == '__main__':
             acc_test, _ = test_img(net_glob, dataset_test, args)
             print("Main accuracy: {:.2f}".format(acc_test))
             val_acc_list.append(acc_test.item())
-            time_aggregation_list.append(end-time_aggregation_start)
+            aggregation_time = end-time_aggregation_start
+            time_aggregation_list.append(aggregation_time)
             time_total_list.append(end-start)
 
             write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args)
+
+            #choose new aggregator here
+            metrics["quality"] = 100*(val_acc_list[-1] - val_acc_list[-2])
+            metrics["time"] = aggregation_time
+            metrics["success_fail"] = 1
+            print(f'quality: {metrics["quality"]} and time: {aggregation_time}')
+            last_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
     
     best_acc = write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args, True)
+    reputation.print_reputation()
     
     # plot loss curve
     plt.figure()
