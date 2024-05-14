@@ -208,7 +208,7 @@ if __name__ == '__main__':
             #choose new aggregator here
             metrics["quality"] = 100*(val_acc_list[-1] - val_acc_list[-2])
             metrics["time"] = aggregation_time
-            metrics["success_fail"] = 1
+            metrics["success_fail"] = 0
             print(f'quality: {metrics["quality"]} and time: {aggregation_time}')
             last_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
     

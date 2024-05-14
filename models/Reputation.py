@@ -8,7 +8,7 @@ class Reputation:
         self.rotation = list()
 
     def recalculate_client(self, metrics, client):
-        QUALITY = 0.33
+        QUALITY = 1
         TIME = 0.33
         SUCCES_FAIL = 0.5
         new_reputation = (metrics["quality"] * QUALITY) - (metrics["time"] * TIME) + (metrics["success_fail"] * SUCCES_FAIL)
