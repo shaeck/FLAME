@@ -7,12 +7,12 @@ from models.test import test_img
 from models.Fed import FedAvg
 from models.Nets import ResNet18, vgg19_bn, vgg19, get_model
 from models.Client import SwarmClient
+from models.BadClient import BadClient
 from models.Reputation import Reputation
 
 from utils.info import print_exp_details, write_info_to_accfile, get_base_info
 from utils.options import args_parser
 from utils.sampling import mnist_iid, mnist_noniid, cifar_iid, cifar_noniid
-from utils.defense import fltrust, multi_krum, get_update, RLR, flame
 import torch
 from torchvision import datasets, transforms
 import numpy as np
@@ -143,13 +143,16 @@ if __name__ == '__main__':
     val_acc_list, net_list, time_total_list, time_aggregation_list = [0], [], [], []
 
     clients = list()
+    clients = [SwarmClient(args, dataset_train, i) for i in range(args.num_users)]
+    badclients_percentage = int((args.num_users / 100) * 60)
+    for i in range(badclients_percentage):
+        clients[i] =  BadClient(args, dataset_train, i)
     last_aggregator = 0
     metrics = dict()
         
     if args.all_clients:
         print("Aggregation over all clients")
         w_locals = [w_glob for _ in range(args.num_users)]
-        clients = [SwarmClient(args, dataset_train, i) for i in range(args.num_users)]
         reputation = Reputation(clients)
     for iter in range(args.epochs):
         start = time.time()
@@ -162,7 +165,6 @@ if __name__ == '__main__':
 
         for num_turn, idx in enumerate(idxs_users):
             w, loss = clients[num_turn].update(net_glob, dict_users[idx])
-            # w_updates.append(get_update(w, w_glob))
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
             else:
