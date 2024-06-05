@@ -1,3 +1,5 @@
+import copy
+
 class Reputation:
     def __init__(self, clients) -> None:
         self.client_dict = dict()
@@ -6,6 +8,9 @@ class Reputation:
             self.client_dict[id_client] = 0
         
         self.rotation = list()
+        self.ROTATION_SIZE = 5
+        if len(self.client_dict) <= self.ROTATION_SIZE:
+            self.ROTATION_SIZE = len(self.client_dict) - 3
 
     def recalculate_client(self, metrics, client):
         QUALITY = 1
@@ -21,17 +26,18 @@ class Reputation:
         return min(clients.items(), key=lambda x: x[1])
 
     def choose(self):
-        ROTATION_SIZE = 5
-        clients = self.client_dict
-        #select the best reputation that has not been in rotation for last 5 rounds
+        clients = copy.deepcopy(self.client_dict)
+        #favour the clients that have never aggregated before
         best_client = self.non_computed_reputation(clients)
         if best_client[1] == 0:
             return best_client[0]
+        #select the best reputation that has not been in rotation for last 5 rounds
         best_client = self.highest_reputation(clients)
         while best_client in self.rotation:
-            best_client = self.highest_reputation(clients.pop(best_client))
+            clients.pop(best_client)
+            best_client = self.highest_reputation(clients)
         #update rotation list
-        if len(self.rotation) >= ROTATION_SIZE:
+        if len(self.rotation) >= self.ROTATION_SIZE and len(self.rotation) != 0:
             self.rotation.pop(0)
         self.rotation.append(best_client)
         return best_client
@@ -41,6 +47,6 @@ class Reputation:
         return self.choose()
     
     def print_reputation(self):
-        for client in self.client_dict.items():
-            print(f'client {client} : reputation {self.client_dict[client]}')
+        for client, rep in self.client_dict.items():
+            print(f'client {client} : reputation {rep}')
 

@@ -1,6 +1,7 @@
 from models.Update import LocalUpdate
 from models.Fed import FedAvg
 import copy
+import time
 
 class BadClient:
     def __init__(self, args, dataset, id):
@@ -14,7 +15,7 @@ class BadClient:
         return w, loss
     
     def aggregate(self, w_locals):
-        self.heavy = 2**20000 % 2
+        time.sleep(0.1)
         return FedAvg(w_locals)
     
     def get_id(self):

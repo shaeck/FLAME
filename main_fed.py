@@ -178,14 +178,16 @@ if __name__ == '__main__':
         #choose client to aggregate here
         if args.swarm:
             #reputation model aggregation
-            w_glob = clients[last_aggregator].aggregate(w_locals)
+            if args.smart:
+                w_glob = clients[last_aggregator].aggregate(w_locals)
             
             #random aggregation
-            # client_id = np.random.randint(0, (len(clients)-1))
-            # w_glob = clients[client_id].aggregate(w_locals)
+            if args.random:
+                client_id = np.random.randint(0, (len(clients)-1))
+                w_glob = clients[client_id].aggregate(w_locals)
         if args.federated:
             #federated learning
-            w_glob = FedAvg(w_locals)
+            w_glob = clients[0].aggregate(w_locals)
         
         # copy weight to net_glob
         net_glob.load_state_dict(w_glob)
@@ -205,14 +207,15 @@ if __name__ == '__main__':
             time_aggregation_list.append(aggregation_time)
             time_total_list.append(end-start)
 
-            write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args)
+            # write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args)
 
             #choose new aggregator here
-            metrics["quality"] = 100*(val_acc_list[-1] - val_acc_list[-2])
-            metrics["time"] = aggregation_time
-            metrics["success_fail"] = 0
-            print(f'quality: {metrics["quality"]} and time: {aggregation_time}')
-            last_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
+            if args.smart:
+                metrics["quality"] = 100*(val_acc_list[-1] - val_acc_list[-2])
+                metrics["time"] = aggregation_time
+                metrics["success_fail"] = 0
+                print(f'quality: {metrics["quality"]} and time: {aggregation_time}')
+                last_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
     
     best_acc = write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args, True)
     reputation.print_reputation()
