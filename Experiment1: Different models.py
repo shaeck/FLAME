@@ -1,10 +1,5 @@
 # Databricks notebook source
 # MAGIC %sh
-# MAGIC pip install scikit-image opencv-python torchmetrics
-
-# COMMAND ----------
-
-# MAGIC %sh
 # MAGIC python main_fed.py --dataset cifar --model VGG --num_users 10 --all_clients --swarm --smart
 # MAGIC echo "-----------------------------------------"
 # MAGIC python main_fed.py --dataset cifar --model resnet --num_users 10 --all_clients --swarm --smart

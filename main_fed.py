@@ -149,6 +149,7 @@ if __name__ == '__main__':
         clients[i] =  BadClient(args, dataset_train, i)
     last_aggregator = 0
     metrics = dict()
+    data_length_div = len(dict_users)
         
     if args.all_clients:
         print("Aggregation over all clients")
@@ -161,10 +162,12 @@ if __name__ == '__main__':
             w_locals = []
             w_updates = []
         m = max(int(args.frac * args.num_users), 1)
+        # m = max(int(args.num_users), 1)
         idxs_users = np.random.choice(range(args.num_users), m, replace=False)
 
         for num_turn, idx in enumerate(idxs_users):
-            w, loss = clients[num_turn].update(net_glob, dict_users[idx])
+            data_seg_id = idx % data_length_div
+            w, loss = clients[num_turn].update(net_glob, dict_users[data_seg_id])
             if args.all_clients:
                 w_locals[idx] = copy.deepcopy(w)
             else:
@@ -216,6 +219,7 @@ if __name__ == '__main__':
                 metrics["success_fail"] = 0
                 print(f'quality: {metrics["quality"]} and time: {aggregation_time}')
                 last_aggregator = reputation.choose_new_aggregator(metrics, last_aggregator)
+                last_aggregator = len(clients)-1
     
     best_acc = write_file(filename, val_acc_list, time_total_list, time_aggregation_list, args, True)
     reputation.print_reputation()

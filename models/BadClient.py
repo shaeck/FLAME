@@ -1,5 +1,5 @@
 from models.Update import LocalUpdate
-from models.Fed import FedAvg
+from models.Fed import BadFedAvg
 import copy
 import time
 
@@ -16,7 +16,7 @@ class BadClient:
     
     def aggregate(self, w_locals):
         time.sleep(0.1)
-        return FedAvg(w_locals)
+        return BadFedAvg(w_locals)
     
     def get_id(self):
         return self.user

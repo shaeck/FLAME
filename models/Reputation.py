@@ -40,6 +40,7 @@ class Reputation:
         if len(self.rotation) >= self.ROTATION_SIZE and len(self.rotation) != 0:
             self.rotation.pop(0)
         self.rotation.append(best_client)
+        print(f'Next aggregator: {best_client}')
         return best_client
 
     def choose_new_aggregator(self, metrics, id_client):

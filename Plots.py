@@ -56,11 +56,16 @@ swarm_smart = [read_file(folder + "accuracy_file_cifar_resnet_avg_1716269630_no_
 
 # COMMAND ----------
 
-folder = "save/0406 - badclients/"
+folder = "save/2206-betteracc/"
+# folder = "save/"
 names = get_accuracy_files(folder)
 fed_names = [s for s in names if "swarm" not in s]
 swarm_rand_names = [s for s in names if "swarm_no" in s]
 swarm_smart_names = [s for s in names if "swarm_smart" in s]
+
+fed_names.sort()
+swarm_smart_names.sort()
+swarm_rand_names.sort()
 
 fed = [read_file(folder + s) for s in fed_names]
 swarm_rand = [read_file(folder + s) for s in swarm_rand_names]
@@ -123,11 +128,15 @@ plot_time("Aggregation time", 2, fed, swarm_rand, swarm_smart, 100)
 
 # COMMAND ----------
 
-folder = "save/0506clientsvariation/"
+folder = "save/1106-clinetvariations/"
 names = get_accuracy_files(folder)
 fed_names = [s for s in names if "swarm" not in s]
 swarm_rand_names = [s for s in names if "swarm_no" in s]
 swarm_smart_names = [s for s in names if "swarm_smart" in s]
+
+fed_names.sort()
+swarm_smart_names.sort()
+swarm_rand_names.sort()
 
 fed = [read_file(folder + s) for s in fed_names]
 swarm_rand = [read_file(folder + s) for s in swarm_rand_names]
@@ -137,3 +146,11 @@ swarm_smart = [read_file(folder + s) for s in swarm_smart_names]
 # COMMAND ----------
 
 plot_six("Multiple clients", 0, fed, swarm_rand, swarm_smart, 101)
+
+# COMMAND ----------
+
+plot_time("Aggregation time", 2, fed, swarm_rand, swarm_smart, 100)
+
+# COMMAND ----------
+
+plot_time("Round time", 1, fed, swarm_rand, swarm_smart, 100)
