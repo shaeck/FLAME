@@ -17,7 +17,7 @@ class Reputation:
         TIME = 0.33
         SUCCES_FAIL = 0.5
         new_reputation = (metrics["quality"] * QUALITY) - (metrics["time"] * TIME) + (metrics["success_fail"] * SUCCES_FAIL)
-        self.client_dict[client] = new_reputation
+        self.client_dict[client] = (0.75 * self.client_dict[client]) + (0.25 * new_reputation)
 
     def highest_reputation(self, clients):
         return max(clients.items(), key=lambda x: x[1])[0]

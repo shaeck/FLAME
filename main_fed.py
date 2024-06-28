@@ -5,7 +5,7 @@ import time
 from random import random
 from models.test import test_img
 from models.Fed import FedAvg
-from models.Nets import ResNet18, vgg19_bn, vgg19, get_model
+from models.Nets import ResNet18, vgg19_bn, vgg11_bn, get_model
 from models.Client import SwarmClient
 from models.BadClient import BadClient
 from models.Reputation import Reputation
@@ -110,9 +110,15 @@ if __name__ == '__main__':
 
     # build model
     if args.model == 'VGG' and args.dataset == 'cifar':
-        net_glob = vgg19_bn().to(args.device)
+        net_glob = vgg19_bn(args.dataset).to(args.device)
     elif args.model == "resnet" and args.dataset == 'cifar':
-        net_glob = ResNet18().to(args.device)
+        net_glob = ResNet18(args.dataset).to(args.device)
+    elif args.model == "resnet" and args.dataset == 'mnist':
+        net_glob = ResNet18(args.dataset).to(args.device)
+    elif args.model == "resnet" and args.dataset == 'fashion_mnist':
+        net_glob = ResNet18(args.dataset).to(args.device)
+    elif args.dataset == 'cifar':
+        net_glob = get_model('cifar10').to(args.device)
     elif args.model == "rlr_mnist" or args.model == "cnn":
         net_glob = get_model('fmnist').to(args.device)
     else:
@@ -182,6 +188,7 @@ if __name__ == '__main__':
         if args.swarm:
             #reputation model aggregation
             if args.smart:
+                print(clients[last_aggregator])
                 w_glob = clients[last_aggregator].aggregate(w_locals)
             
             #random aggregation
